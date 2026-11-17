@@ -1,20 +1,28 @@
-name: Android APK
+name: Builds
 
-# Compile l'APK debug du projet android/ sur les runners GitHub.
-# Aucune installation locale n'est necessaire : JDK, SDK et NDK viennent du runner.
-# Le coeur DSP C++ etant partage (android/app/src/main/cpp/CMakeLists.txt compile
-# ../core), les changements dans core/ declenchent aussi le build.
+# Compile les deux cibles du projet sur les runners GitHub :
+#  - Android : APK debug (Kotlin + JNI arm64/armv7) ;
+#  - Windows : coeur DSP + banc d'essai, via build.bat (MinGW-w64/UCRT).
+# Le coeur C++ etant partage (android/app/src/main/cpp/CMakeLists.txt compile
+# ../core, build.bat compile core/), les changements dans core/ declenchent
+# les deux jobs.
 
 on:
   push:
     paths:
       - "android/**"
       - "core/**"
+      - "win/**"
+      - "tools/**"
+      - "build.bat"
       - ".github/workflows/android.yml"
   pull_request:
     paths:
       - "android/**"
       - "core/**"
+      - "win/**"
+      - "tools/**"
+      - "build.bat"
       - ".github/workflows/android.yml"
   workflow_dispatch:
 
@@ -22,7 +30,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-apk-${{ github.ref }}
+  group: builds-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -78,3 +86,42 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+
+  build-windows-selftest:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: cmd
+
+    steps:
+      - name: Recuperer le depot
+        uses: actions/checkout@v4
+
+      # build.bat demande g++ (MinGW-w64 + UCRT, voir README). Le runner Windows
+      # n'en fournit pas : on installe la chaine UCRT64 de MSYS2. path-type
+      # inherit la rend visible aux etapes suivantes, donc "where g++" dans
+      # build.bat la trouve.
+      - name: MinGW-w64 (MSYS2 UCRT64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: mingw-w64-ucrt-x86_64-gcc
+          path-type: inherit
+
+      - name: Verifier la chaine de compilation
+        run: |
+          where g++
+          g++ --version
+
+      # Construit build\SDRStudio.exe et build\sdr_selftest.exe.
+      # librtlsdr.dll est chargee dynamiquement a l'execution : aucune
+      # dependance a installer pour compiler.
+      - name: Compiler le coeur DSP et l'auto-test (build.bat)
+        run: build.bat
+
+      # Modes, FM stereo, invariance de phase et debit : le programme sort en
+      # erreur si un controle echoue.
+      - name: Lancer l'auto-test du coeur DSP
+        run: build\sdr_selftest.exe

@@ -102,10 +102,23 @@ set "ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk"
 ```
 
 `local.properties` fixe `sdk.dir`. Sortie : `app/build/outputs/apk/debug/app-debug.apk`.
+
+Le wrapper Gradle est fourni (`gradlew` / `gradlew.bat`, Gradle 8.7). Sur cette machine le
+JDK n'est pas dans le `PATH` : `gradlew.bat` a besoin de `JAVA_HOME` (et de `sdk.dir` ou
+`ANDROID_HOME` pour le SDK).
+
+```bat
+set "JAVA_HOME=%LOCALAPPDATA%\android-toolchain\jdk-17"
+cd android
+.\gradlew.bat --console=plain assembleDebug
+```
 Installation : `adb install -r app\build\outputs\apk\debug\app-debug.apk`.
 
 Un workflow GitHub Actions (`.github/workflows/android.yml`) fait le même build sur
-`ubuntu-latest` avec le NDK, sans Android Studio.
+`ubuntu-latest` avec le NDK, sans Android Studio. Il contient aussi un job
+`build-windows-selftest` (`windows-latest`, MSYS2 UCRT64) qui rejoue `build.bat` puis
+`build\sdr_selftest.exe` : le cœur DSP et le banc d'essai sont donc vérifiés en CI au même
+titre que l'APK.
 
 Contrôle rapide du pont JNI hors NDK (sans le backend USB) :
 

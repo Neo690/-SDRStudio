@@ -28,6 +28,9 @@ android/app/.cxx/
 # Archives de binaires vendorees (les binaires eux-memes ne sont pas versionnes)
 *.zip
 
+# ... sauf le wrapper Gradle, qui doit etre versionne (gradlew / gradlew.bat)
+!android/gradle/wrapper/gradle-wrapper.jar
+
 # ---------------------------------------------------------------------------
 # Configuration locale de la machine (chemin du SDK Android, etc.)
 # ---------------------------------------------------------------------------
