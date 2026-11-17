@@ -66,18 +66,19 @@ jobs:
             "ndk;26.1.10909125" \
             "cmake;3.22.1"
 
-      - name: Gradle 8.7
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.7"
-
-      # local.properties contient le chemin du SDK d'une machine de developpement
-      # (C:/Users/...). Le runner fournit ANDROID_HOME : ce fichier le masquerait.
+      # local.properties (sdk.dir) est ignore par git : il ne vient jamais du
+      # depot. Le runner fournit ANDROID_HOME / ANDROID_SDK_ROOT, ce qui suffit
+      # a l'AGP. On le retire quand meme au cas ou une copie locale aurait ete
+      # commitee par erreur (elle masquerait le SDK du runner).
       - name: Retirer local.properties
         run: rm -f local.properties
 
+      # Gradle 8.7 vient du wrapper versionne (android/gradlew, mode 100755,
+      # LF dans l'index) : pas d'action setup-gradle, le script telecharge la
+      # distribution declaree dans gradle-wrapper.properties. JAVA_HOME vient de
+      # setup-java, le SDK de setup-android.
       - name: Compiler l'APK debug (Kotlin + JNI arm64/armv7)
-        run: gradle --console=plain assembleDebug
+        run: ./gradlew --console=plain assembleDebug
 
       - name: Publier l'APK
         uses: actions/upload-artifact@v4
