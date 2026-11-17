@@ -1,13 +1,11 @@
 name: Builds
 
-# Compile les deux cibles du projet sur les runners GitHub :
-#  - Android : APK debug (Kotlin + JNI arm64/armv7) ;
-#  - Windows : coeur DSP + banc d'essai, via build.bat (MinGW-w64/UCRT).
-# Le coeur C++ etant partage (android/app/src/main/cpp/CMakeLists.txt compile
-# ../core, build.bat compile core/), les changements dans core/ declenchent
-# les deux jobs.
+# Deux cibles : APK Android (Kotlin + JNI) et coeur DSP Windows + auto-test via
+# build.bat. Le coeur C++ etant partage, core/ declenche les deux jobs.
 
 on:
+  # Listes identiques sous push et pull_request : gardees explicites plutot
+  # qu'avec une ancre YAML, pour ne pas dependre du parseur de GitHub sur "on".
   push:
     paths:
       - "android/**"
@@ -45,19 +43,18 @@ jobs:
       - name: Recuperer le depot
         uses: actions/checkout@v4
 
+      # JAVA_HOME pour le wrapper, ANDROID_HOME / ANDROID_SDK_ROOT pour l'AGP :
+      # local.properties (sdk.dir) est ignore par git, il n'arrive donc jamais ici.
       - name: JDK 17 (Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      # Installe les command-line tools, accepte les licences du SDK et met
-      # sdkmanager sur le PATH.
       - name: SDK Android (cmdline-tools + licences)
         uses: android-actions/setup-android@v4
 
-      # Versions imposees par android/app/build.gradle.kts (compileSdk 34,
-      # build-tools 34.0.0, ndkVersion 26.1.10909125, CMake 3.22.1).
+      # Versions imposees par android/app/build.gradle.kts.
       - name: Installer le NDK, CMake et platform 34
         run: |
           sdkmanager --install \
@@ -65,13 +62,6 @@ jobs:
             "build-tools;34.0.0" \
             "ndk;26.1.10909125" \
             "cmake;3.22.1"
-
-      # local.properties (sdk.dir) est ignore par git : il ne vient jamais du
-      # depot. Le runner fournit ANDROID_HOME / ANDROID_SDK_ROOT, ce qui suffit
-      # a l'AGP. On le retire quand meme au cas ou une copie locale aurait ete
-      # commitee par erreur (elle masquerait le SDK du runner).
-      - name: Retirer local.properties
-        run: rm -f local.properties
 
       # Remplace le cache de l'action setup-gradle supprimee : dependances dans
       # ~/.gradle/caches, distribution Gradle 8.7 dans ~/.gradle/wrapper.
@@ -85,10 +75,6 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      # Gradle 8.7 vient du wrapper versionne (android/gradlew, mode 100755,
-      # LF dans l'index) : pas d'action setup-gradle, le script telecharge la
-      # distribution declaree dans gradle-wrapper.properties. JAVA_HOME vient de
-      # setup-java, le SDK de setup-android.
       - name: Compiler l'APK debug (Kotlin + JNI arm64/armv7)
         run: ./gradlew --console=plain assembleDebug
 
@@ -111,10 +97,8 @@ jobs:
       - name: Recuperer le depot
         uses: actions/checkout@v4
 
-      # build.bat demande g++ (MinGW-w64 + UCRT, voir README). Le runner Windows
-      # n'en fournit pas : on installe la chaine UCRT64 de MSYS2. path-type
-      # inherit la rend visible aux etapes suivantes, donc "where g++" dans
-      # build.bat la trouve.
+      # build.bat exige g++ (MinGW-w64 + UCRT), absent du runner : path-type
+      # inherit met UCRT64 sur le PATH des etapes suivantes.
       - name: MinGW-w64 (MSYS2 UCRT64)
         uses: msys2/setup-msys2@v2
         with:
@@ -123,18 +107,11 @@ jobs:
           install: mingw-w64-ucrt-x86_64-gcc
           path-type: inherit
 
-      - name: Verifier la chaine de compilation
-        run: |
-          where g++
-          g++ --version
-
-      # Construit build\SDRStudio.exe et build\sdr_selftest.exe.
-      # librtlsdr.dll est chargee dynamiquement a l'execution : aucune
-      # dependance a installer pour compiler.
+      # Construit SDRStudio.exe et sdr_selftest.exe ; librtlsdr.dll est chargee
+      # a l'execution, donc rien d'autre a installer.
       - name: Compiler le coeur DSP et l'auto-test (build.bat)
         run: build.bat
 
-      # Modes, FM stereo, invariance de phase et debit : le programme sort en
-      # erreur si un controle echoue.
+      # Sort en erreur si un controle DSP echoue (modes, stereo, debit).
       - name: Lancer l'auto-test du coeur DSP
         run: build\sdr_selftest.exe
