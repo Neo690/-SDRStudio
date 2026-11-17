@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- RTL2832U / RTL2838 / RTL2840 (Realtek) : propose SDR Studio au branchement. -->
+<resources>
+    <usb-device vendor-id="3034" />
+</resources>

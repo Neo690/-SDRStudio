@@ -1,0 +1,45 @@
+# ---------------------------------------------------------------------------
+# Sorties de build : Windows (build.bat) et Android (Gradle + CMake/NDK)
+# ---------------------------------------------------------------------------
+/build/
+android/app/build/
+android/build/
+android/.gradle/
+android/app/.cxx/
+.gradle/
+.cxx/
+
+# ---------------------------------------------------------------------------
+# Binaires produits par la toolchain (jamais sources)
+# ---------------------------------------------------------------------------
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.o
+*.obj
+*.apk
+*.aab
+*.jar
+*.class
+
+# Archives de binaires vendorees (les binaires eux-memes ne sont pas versionnes)
+*.zip
+
+# ---------------------------------------------------------------------------
+# Configuration locale de la machine (chemin du SDK Android, etc.)
+# ---------------------------------------------------------------------------
+local.properties
+**/local.properties
+
+# ---------------------------------------------------------------------------
+# IDE, journaux, divers
+# ---------------------------------------------------------------------------
+.idea/
+*.iml
+*.log
+.vscode/
+.DS_Store
+Thumbs.db

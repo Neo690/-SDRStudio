@@ -1,0 +1,80 @@
+name: Android APK
+
+# Compile l'APK debug du projet android/ sur les runners GitHub.
+# Aucune installation locale n'est necessaire : JDK, SDK et NDK viennent du runner.
+# Le coeur DSP C++ etant partage (android/app/src/main/cpp/CMakeLists.txt compile
+# ../core), les changements dans core/ declenchent aussi le build.
+
+on:
+  push:
+    paths:
+      - "android/**"
+      - "core/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "android/**"
+      - "core/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android
+
+    steps:
+      - name: Recuperer le depot
+        uses: actions/checkout@v4
+
+      - name: JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Installe les command-line tools, accepte les licences du SDK et met
+      # sdkmanager sur le PATH.
+      - name: SDK Android (cmdline-tools + licences)
+        uses: android-actions/setup-android@v4
+
+      # Versions imposees par android/app/build.gradle.kts (compileSdk 34,
+      # build-tools 34.0.0, ndkVersion 26.1.10909125, CMake 3.22.1).
+      - name: Installer le NDK, CMake et platform 34
+        run: |
+          sdkmanager --install \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "ndk;26.1.10909125" \
+            "cmake;3.22.1"
+
+      - name: Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      # local.properties contient le chemin du SDK d'une machine de developpement
+      # (C:/Users/...). Le runner fournit ANDROID_HOME : ce fichier le masquerait.
+      - name: Retirer local.properties
+        run: rm -f local.properties
+
+      - name: Compiler l'APK debug (Kotlin + JNI arm64/armv7)
+        run: gradle --console=plain assembleDebug
+
+      - name: Publier l'APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdrstudio-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
