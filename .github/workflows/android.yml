@@ -73,6 +73,18 @@ jobs:
       - name: Retirer local.properties
         run: rm -f local.properties
 
+      # Remplace le cache de l'action setup-gradle supprimee : dependances dans
+      # ~/.gradle/caches, distribution Gradle 8.7 dans ~/.gradle/wrapper.
+      - name: Cache Gradle (dependances + wrapper)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle.kts', 'android/gradle.properties', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
       # Gradle 8.7 vient du wrapper versionne (android/gradlew, mode 100755,
       # LF dans l'index) : pas d'action setup-gradle, le script telecharge la
       # distribution declaree dans gradle-wrapper.properties. JAVA_HOME vient de
