@@ -45,6 +45,8 @@ android {
 }
 
 dependencies {
-    // appcompat suffit : aucune extension core-ktx n'est utilisee.
+    // appcompat pour les dialogues/listeners, material pour le theme M3 et les
+    // composants de l'interface (boutons tonals, cartes arrondies).
     implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("com.google.android.material:material:1.12.0")
 }

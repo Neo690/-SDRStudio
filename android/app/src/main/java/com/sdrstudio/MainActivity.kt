@@ -13,16 +13,25 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.content.res.ColorStateList
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.text.InputType
 import android.view.Gravity
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -34,6 +43,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var spectrumView: SpectrumView
     private lateinit var statusView: TextView
+    private lateinit var freqView: TextView
+    private lateinit var sourceChip: TextView
     private lateinit var modeButton: Button
     private lateinit var gainButton: Button
     private lateinit var ppmButton: Button
@@ -128,23 +139,90 @@ class MainActivity : AppCompatActivity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xFF0C1016.toInt())
-            setPadding(16, 40, 16, 16)
+            setBackgroundColor(color(R.color.bg))
+            fitsSystemWindows = true
+            setPadding(dp(16), dp(8), dp(16), dp(10))
         }
 
+        // En-tete : nom du poste a gauche, source active a droite.
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        header.addView(TextView(this).apply {
+            text = "SDR STUDIO"
+            setTextColor(color(R.color.accent))
+            textSize = 12f
+            letterSpacing = 0.26f
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f)
+        })
+        sourceChip = chip("aucune source")
+        header.addView(sourceChip)
+        root.addView(header, wrap())
+
+        // Frequence courante en gros : c'est la valeur qu'on lit de loin.
+        val freqRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.BOTTOM
+            layoutParams = wrap().apply { topMargin = dp(4) }
+        }
+        freqView = TextView(this).apply {
+            text = "101.500"
+            setTextColor(color(R.color.text))
+            textSize = 38f
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+        }
+        freqRow.addView(freqView)
+        freqRow.addView(TextView(this).apply {
+            text = " MHz"
+            setTextColor(color(R.color.text_dim))
+            textSize = 15f
+            setPadding(0, 0, 0, dp(5))
+        })
+        root.addView(freqRow)
+
+        // Spectre + waterfall : carte arrondie qui prend la hauteur restante.
+        val spectrumCard = MaterialCardView(this).apply {
+            radius = dp(20).toFloat()
+            strokeWidth = dp(1)
+            strokeColor = color(R.color.surface_3)
+            cardElevation = 0f
+            setCardBackgroundColor(color(R.color.spectrum_bg))
+            clipToOutline = true
+            layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f).apply {
+                topMargin = dp(8)
+                bottomMargin = dp(8)
+            }
+        }
         spectrumView = SpectrumView(this).apply {
             sampleRateHz = 2.4e6
             // En direct on accorde ; en rejeu on deplace le canal dans la bande
             // deja enregistree, le spectre restant celui du fichier.
             onTune = { delta -> if (replayFile != null) setOffset(delta) else tune(centerHz + delta) }
         }
-        root.addView(spectrumView, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        spectrumCard.addView(spectrumView, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        root.addView(spectrumCard)
 
+        // Ligne d'etat monospace : source, mode, niveau du canal, messages.
+        val statusCard = MaterialCardView(this).apply {
+            radius = dp(16).toFloat()
+            strokeWidth = dp(1)
+            strokeColor = color(R.color.surface_3)
+            cardElevation = 0f
+            setCardBackgroundColor(color(R.color.surface))
+            layoutParams = wrap()
+        }
         statusView = TextView(this).apply {
-            setTextColor(0xFF9AC0D8.toInt())
-            textSize = 12f
-            gravity = Gravity.START
+            setTextColor(color(R.color.text_dim))
+            textSize = 11f
+            typeface = Typeface.MONOSPACE
+            setLineSpacing(0f, 1.2f)
+            // Deux lignes reservees : l'apparition d'un etat (REC, SCAN, message)
+            // ne doit pas faire respirer la carte, sinon le spectre se redessine
+            // et le waterfall repart de zero.
+            minLines = 2
+            setPadding(dp(12), dp(8), dp(12), dp(8))
             // Apres un arret depuis la notification, la ligne d'etat relance.
             setOnClickListener {
                 if (stopped) {
@@ -153,37 +231,48 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        root.addView(statusView)
+        statusCard.addView(statusView)
+        root.addView(statusCard)
 
-        // Deux rangees de commandes : largeur partagee, texte reduit.
-        fun row(): LinearLayout = LinearLayout(this).apply {
+        // Commandes : quatre rangees de boutons tonals a largeur partagee.
+        fun row(top: Int): LinearLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = wrap().apply { topMargin = dp(top) }
         }
 
         fun button(parent: LinearLayout, label: String, action: () -> Unit): Button {
-            val b = Button(this)
-            b.text = label
-            b.isAllCaps = false
-            b.textSize = 11f
-            b.setPadding(2, 0, 2, 0)
-            b.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            b.setOnClickListener { action() }
+            val b = MaterialButton(this).apply {
+                text = label
+                isAllCaps = false
+                textSize = 10.5f
+                letterSpacing = 0f
+                cornerRadius = dp(14)
+                insetTop = 0
+                insetBottom = 0
+                minHeight = dp(46)
+                minWidth = 0
+                stateListAnimator = null
+                setPadding(dp(2), 0, dp(2), 0)
+                backgroundTintList = ColorStateList.valueOf(color(R.color.surface_2))
+                setTextColor(color(R.color.text_dim))
+                layoutParams = LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginEnd = dp(6) }
+                setOnClickListener { action() }
+            }
             parent.addView(b)
             return b
         }
 
-        val radioRow = row()
+        val radioRow = row(10)
         button(radioRow, "−1 MHz") { tune(centerHz - 1e6) }
         button(radioRow, "+1 MHz") { tune(centerHz + 1e6) }
         modeButton = button(radioRow, SdrEngine.modeNames[mode]) { cycleMode() }
         button(radioRow, "Vol −") { setVolume(volume - 0.1f) }
         button(radioRow, "Vol +") { setVolume(volume + 0.1f) }
+        tint(modeButton, color(R.color.accent_dim), color(R.color.accent))
         root.addView(radioRow)
 
-        val rxRow = row()
+        val rxRow = row(6)
         gainButton = button(rxRow, "Gain auto") { cycleGain() }
         ppmButton = button(rxRow, "PPM 0") { cyclePpm() }
         squelchButton = button(rxRow, "SQL off") { cycleSquelch() }
@@ -192,7 +281,7 @@ class MainActivity : AppCompatActivity() {
         root.addView(rxRow)
 
         // Rejeu : choisir un .cu8 deja enregistre, puis se deplacer dans sa bande.
-        val replayRow = row()
+        val replayRow = row(6)
         replayButton = button(replayRow, "REJEU") { cycleReplay() }
         offsetDownButton = button(replayRow, "-25 kHz") { nudgeOffset(-25e3) }
         offsetCentreButton = button(replayRow, "centre") { setOffset(0.0) }
@@ -200,7 +289,7 @@ class MainActivity : AppCompatActivity() {
         root.addView(replayRow)
 
         // Memories nommees et scan pilote par le squelch.
-        val memoryRow = row()
+        val memoryRow = row(6)
         memoryAddButton = button(memoryRow, "MEM+") { addMemory() }
         memoryListButton = button(memoryRow, "MEM") { showMemories() }
         scanButton = button(memoryRow, "SCAN") { toggleScan() }
@@ -280,6 +369,7 @@ class MainActivity : AppCompatActivity() {
     /** Reglages communs au direct et au rejeu, puis audio et rafraichissement. */
     private fun afterStart() {
         sourceLabel = File(SdrEngine.nativeSourceName()).name
+        sourceChip.text = sourceLabel
 
         // Les paliers de gain dependent du tuner : on les relit a chaque demarrage.
         gains = SdrEngine.nativeGains()
@@ -490,7 +580,7 @@ class MainActivity : AppCompatActivity() {
             setSelection(text.length)
             setPadding(48, 24, 48, 0)
         }
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(String.format("Mémoriser %.3f MHz %s", centerHz / 1e6, SdrEngine.modeNames[mode]))
             .setView(input)
             .setPositiveButton("Enregistrer") { _, _ ->
@@ -542,7 +632,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun confirmDeleteMemory(m: Memory) {
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(m.name)
             .setMessage(String.format("Supprimer la mémoire %.3f MHz %s ?", m.hz / 1e6, modeName(m.mode)))
             .setPositiveButton("Supprimer") { _, _ ->
@@ -592,6 +682,7 @@ class MainActivity : AppCompatActivity() {
         tune(if (next > hi) lo else next)
         scanSettle = 1
         scanButton.text = "STOP SCAN"
+        tintActive(scanButton, true)
         handler.removeCallbacks(scanRunnable)
         handler.post(scanRunnable)
     }
@@ -603,6 +694,7 @@ class MainActivity : AppCompatActivity() {
         refineIndex = 0
         handler.removeCallbacks(scanRunnable)
         scanButton.text = "SCAN"
+        tintActive(scanButton, false)
         if (found) flashMessage(String.format("scan arrêté : %.3f MHz", centerHz / 1e6))
     }
 
@@ -701,12 +793,55 @@ class MainActivity : AppCompatActivity() {
         squelchButton.text = if (squelchOn) String.format("SQL %.0f", squelchDb) else "SQL off"
         wavButton.text = if (wavPath != null) "STOP WAV" else "REC WAV"
         iqButton.text = if (iqPath != null) "STOP IQ" else "REC IQ"
+        tintRecording(wavButton, wavPath != null)
+        tintRecording(iqButton, iqPath != null)
         val replaying = replayFile != null
         replayButton.text = if (replaying) "LIVE" else "REJEU"
         offsetDownButton.isEnabled = replaying
         offsetUpButton.isEnabled = replaying
         offsetCentreButton.isEnabled = replaying
+        tintActive(replayButton, replaying)
     }
+
+    // ----------------------------------------------------------- mise en page
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private fun color(id: Int): Int = ContextCompat.getColor(this, id)
+
+    private fun wrap(): LinearLayout.LayoutParams =
+        LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
+
+    /** Pastille arrondie (source active, etat court). */
+    private fun chip(text: String): TextView = TextView(this).apply {
+        this.text = text
+        setTextColor(color(R.color.text_dim))
+        textSize = 10.5f
+        letterSpacing = 0.05f
+        setPadding(dp(10), dp(4), dp(10), dp(4))
+        background = GradientDrawable().apply {
+            cornerRadius = dp(12).toFloat()
+            setColor(color(R.color.surface_2))
+            setStroke(dp(1), color(R.color.surface_3))
+        }
+    }
+
+    /** Fond et texte d'un bouton tonal : etat actif (accent) ou repos. */
+    private fun tint(b: Button, background: Int, foreground: Int) {
+        val button = b as? MaterialButton ?: return
+        button.backgroundTintList = ColorStateList.valueOf(background)
+        button.setTextColor(foreground)
+    }
+
+    /** Enregistrement en cours : bouton rouge, sinon tonal. */
+    private fun tintRecording(b: Button, active: Boolean) =
+        tint(b, if (active) color(R.color.danger) else color(R.color.surface_2),
+            if (active) color(R.color.on_danger) else color(R.color.text_dim))
+
+    /** Mode actif (scan, rejeu) : bouton turquoise, sinon tonal. */
+    private fun tintActive(b: Button, active: Boolean) =
+        tint(b, if (active) color(R.color.accent) else color(R.color.surface_2),
+            if (active) color(R.color.on_accent) else color(R.color.text_dim))
 
     private val statusRunnable = object : Runnable {
         override fun run() {
@@ -716,23 +851,27 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             val db = SdrEngine.nativeChannelDb()
-            val rec = buildString {
-                if (wavPath != null) append("  |  REC WAV")
-                if (iqPath != null) append("  |  REC IQ")
-            }
+            val freqText = String.format(Locale.US, "%.3f", centerHz / 1e6)
+            if (freqView.text != freqText) freqView.text = freqText
+            if (flash.isNotEmpty() && System.currentTimeMillis() > flashUntil) flash = ""
+
+            // La source est deja dans la pastille de l'en-tete : la ligne d'etat
+            // ne garde que ce qui change (frequence, mode, niveau, volume).
             val file = replayFile
             val where = if (file != null) String.format("offset %+.1f kHz", offsetHz / 1e3)
             else String.format("%.3f MHz", centerHz / 1e6)
-            val tag = if (file != null) "  |  REJEU ${file.name}" else ""
-            if (flash.isNotEmpty() && System.currentTimeMillis() > flashUntil) flash = ""
-            val extra = when {
-                scanning -> String.format("  |  SCAN %.3f MHz", centerHz / 1e6)
-                flash.isNotEmpty() -> "  |  $flash"
-                else -> ""
-            }
-            statusView.text = String.format(
-                "%s%s\n%s  |  %s  |  canal %.1f dBFS  |  vol %.0f%%%s%s",
-                sourceLabel, tag, where, SdrEngine.modeNames[mode], db, volume * 100, rec, extra)
+            val headline = String.format(
+                "%s · %s · %.1f dBFS · vol %.0f %%",
+                where, SdrEngine.modeNames[mode], db, volume * 100)
+
+            val extras = mutableListOf<String>()
+            if (file != null) extras.add("rejeu ${file.name}".take(30))
+            if (scanning) extras.add(String.format("SCAN %.3f MHz", centerHz / 1e6))
+            if (wavPath != null) extras.add("REC WAV")
+            if (iqPath != null) extras.add("REC IQ")
+            if (flash.isNotEmpty()) extras.add(flash)
+            statusView.text = if (extras.isEmpty()) headline
+            else headline + "\n" + extras.joinToString(" · ")
             pushNotification()
             spectrumView.invalidate()
             handler.postDelayed(this, 33)

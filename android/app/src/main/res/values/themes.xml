@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Material 3 sombre : l'app est une console de reception, elle reste
+         lisible de nuit quels que soient les reglages du telephone. -->
+    <style name="Theme.SdrStudio" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorOnPrimary">@color/on_accent</item>
+        <item name="colorPrimaryContainer">@color/accent_dim</item>
+        <item name="colorOnPrimaryContainer">@color/accent</item>
+
+        <item name="colorSecondaryContainer">@color/surface_2</item>
+        <item name="colorOnSecondaryContainer">@color/text</item>
+
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text</item>
+        <item name="colorSurfaceVariant">@color/surface_2</item>
+        <item name="colorOnSurfaceVariant">@color/text_dim</item>
+        <item name="colorOutline">@color/surface_3</item>
+
+        <item name="colorError">@color/danger</item>
+        <item name="colorOnError">@color/on_danger</item>
+
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:textColorPrimary">@color/text</item>
+        <item name="android:textColorSecondary">@color/text_dim</item>
+    </style>
+</resources>

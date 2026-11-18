@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Palette sombre « console » : fond presque noir, surfaces bleutees,
+     accent turquoise pour les actions et le spectre. -->
+<resources>
+    <color name="bg">#FF0B0F14</color>
+    <color name="surface">#FF121A23</color>
+    <color name="surface_2">#FF1A242F</color>
+    <color name="surface_3">#FF26323F</color>
+
+    <color name="accent">#FF35D0BA</color>
+    <color name="on_accent">#FF04201C</color>
+    <color name="accent_dim">#FF10312C</color>
+
+    <color name="text">#FFE8EFF7</color>
+    <color name="text_dim">#FF8FA3B8</color>
+
+    <color name="danger">#FFFF5C7A</color>
+    <color name="on_danger">#FF2A0710</color>
+
+    <color name="spectrum_bg">#FF0C1016</color>
+</resources>
