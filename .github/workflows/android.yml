@@ -1,34 +1,31 @@
-name: Builds
+name: Android
 
-# Deux cibles : APK Android (Kotlin + JNI) et coeur DSP Windows + auto-test via
-# build.bat. Le coeur C++ etant partage, core/ declenche les deux jobs.
+# APK debug : Kotlin + JNI (arm64/armv7). Le coeur C++ est partage (le
+# CMakeLists Android compile ../core), donc un changement de core/ declenche
+# aussi le workflow Windows. Windows, lui, est couvert par windows.yml.
 
 on:
-  # Listes identiques sous push et pull_request : gardees explicites plutot
-  # qu'avec une ancre YAML, pour ne pas dependre du parseur de GitHub sur "on".
+  # Chemins propres a Android : un changement de win/, tools/ ou build.bat ne
+  # lance pas ce workflow.
   push:
     paths:
       - "android/**"
       - "core/**"
-      - "win/**"
-      - "tools/**"
-      - "build.bat"
       - ".github/workflows/android.yml"
   pull_request:
     paths:
       - "android/**"
       - "core/**"
-      - "win/**"
-      - "tools/**"
-      - "build.bat"
       - ".github/workflows/android.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Groupe distinct de celui de windows.yml : deux workflows qui partagent un
+# groupe s'annuleraient mutuellement.
 concurrency:
-  group: builds-${{ github.ref }}
+  group: android-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -85,33 +82,3 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
-
-  build-windows-selftest:
-    runs-on: windows-latest
-    timeout-minutes: 20
-    defaults:
-      run:
-        shell: cmd
-
-    steps:
-      - name: Recuperer le depot
-        uses: actions/checkout@v4
-
-      # build.bat exige g++ (MinGW-w64 + UCRT), absent du runner : path-type
-      # inherit met UCRT64 sur le PATH des etapes suivantes.
-      - name: MinGW-w64 (MSYS2 UCRT64)
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: false
-          install: mingw-w64-ucrt-x86_64-gcc
-          path-type: inherit
-
-      # Construit SDRStudio.exe et sdr_selftest.exe ; librtlsdr.dll est chargee
-      # a l'execution, donc rien d'autre a installer.
-      - name: Compiler le coeur DSP et l'auto-test (build.bat)
-        run: build.bat
-
-      # Sort en erreur si un controle DSP echoue (modes, stereo, debit).
-      - name: Lancer l'auto-test du coeur DSP
-        run: build\sdr_selftest.exe

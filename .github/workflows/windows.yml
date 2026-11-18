@@ -1,0 +1,65 @@
+name: Windows
+
+# Coeur DSP + banc d'essai compiles par build.bat (MinGW-w64 / UCRT), puis
+# auto-test. Le coeur etant partage avec Android, un changement de core/
+# declenche aussi le workflow Android ; Android, lui, est couvert par
+# android.yml.
+
+on:
+  # Chemins propres a Windows : un changement de android/ ne lance pas ce
+  # workflow.
+  push:
+    paths:
+      - "core/**"
+      - "win/**"
+      - "tools/**"
+      - "build.bat"
+      - ".github/workflows/windows.yml"
+  pull_request:
+    paths:
+      - "core/**"
+      - "win/**"
+      - "tools/**"
+      - "build.bat"
+      - ".github/workflows/windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Groupe distinct de celui de android.yml : deux workflows qui partagent un
+# groupe s'annuleraient mutuellement.
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows-selftest:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: cmd
+
+    steps:
+      - name: Recuperer le depot
+        uses: actions/checkout@v4
+
+      # build.bat exige g++ (MinGW-w64 + UCRT), absent du runner : path-type
+      # inherit met UCRT64 sur le PATH des etapes suivantes.
+      - name: MinGW-w64 (MSYS2 UCRT64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: mingw-w64-ucrt-x86_64-gcc
+          path-type: inherit
+
+      # Construit SDRStudio.exe et sdr_selftest.exe ; librtlsdr.dll est chargee
+      # a l'execution, donc rien d'autre a installer.
+      - name: Compiler le coeur DSP et l'auto-test (build.bat)
+        run: build.bat
+
+      # Sort en erreur si un controle DSP echoue (modes, stereo, debit).
+      - name: Lancer l'auto-test du coeur DSP
+        run: build\sdr_selftest.exe
